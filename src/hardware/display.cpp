@@ -16,14 +16,7 @@ void Display::init() {
   tft.setTextSize(2);
   
   // Draw initial static elements
-  drawDeadZones();
   drawPentatonicZones();
-}
-
-void Display::drawDeadZones() {
-  // Draw red rectangles for top and bottom dead zones
-  tft.drawRect(0, 0, tft.width(), DEAD_ZONE_SIZE, TFT_RED);
-  tft.drawRect(0, tft.height() - DEAD_ZONE_SIZE, tft.width(), DEAD_ZONE_SIZE, TFT_RED);
 }
 
 void Display::drawPentatonicZones() {
@@ -47,19 +40,21 @@ void Display::drawPentatonicZones() {
       int xPos = (int)(normalizedPos * tft.width());
       
       if (xPos >= 0 && xPos < tft.width()) {
-        // Draw vertical line (dark green outline, only in the playable area, avoiding dead zones)
-        tft.drawLine(xPos, DEAD_ZONE_SIZE, xPos, tft.height() - DEAD_ZONE_SIZE, TFT_DARKGREEN);
+        // Draw vertical line (dark green outline, top half of screen only)
+        int controlAreaHeight = tft.height() / 2;
+        tft.drawLine(xPos, 0, xPos, controlAreaHeight, TFT_DARKGREEN);
       }
     }
   }
 }
 
 void Display::redrawStaticElements() {
-  // Redraw dead zones
-  drawDeadZones();
-  
   // Redraw pentatonic zone dividers
   drawPentatonicZones();
+  
+  // Redraw divider line between top and bottom halves
+  int controlAreaHeight = tft.height() / 2;
+  tft.drawLine(0, controlAreaHeight, tft.width(), controlAreaHeight, TFT_WHITE);
   
   // Redraw text that might get rubbed off
   tft.setCursor(10, 100);

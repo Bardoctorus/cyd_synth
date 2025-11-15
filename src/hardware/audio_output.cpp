@@ -54,12 +54,13 @@ bool AudioOutput::init() {
 void AudioOutput::applyLimiter(float& left, float& right) {
   // Hard clip to -1.0 to 1.0 range (safety limit before DAC)
   // This prevents any possibility of clipping or damage
+  // With proper gain staging, this should rarely be needed
   left = constrain(left, -1.0, 1.0);
   right = constrain(right, -1.0, 1.0);
 }
 
 void AudioOutput::write(float leftSample, float rightSample) {
-  // Apply safety limiter
+  // Apply hard limiter (safety protection)
   applyLimiter(leftSample, rightSample);
   
   // Scale to fixed amplitude and convert to int16

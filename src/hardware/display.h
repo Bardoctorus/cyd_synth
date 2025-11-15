@@ -12,9 +12,8 @@ class Display {
 public:
   Display();
   void init();
-  void drawDeadZones();
   void drawPentatonicZones();
-  void redrawStaticElements();  // Redraws dead zones, pentatonic dividers, and text
+  void redrawStaticElements();  // Redraws pentatonic dividers and text
   void update();  // Periodic update (call from loop)
   
   // Access to underlying TFT for advanced operations

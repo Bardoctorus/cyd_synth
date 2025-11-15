@@ -21,6 +21,9 @@ public:
   // Convert touch position to frequency (quantized to pentatonic)
   float touchToFrequency(int touchX, int screenWidth);
   
+  // Set base frequency for pentatonic scale (called when base note slider changes)
+  void setBaseFrequency(float baseFreq);
+  
   // Convert touch position to filter cutoff
   float touchToFilterCutoff(int touchY, int screenHeight);
   
@@ -36,6 +39,7 @@ public:
 private:
   float quantizeToPentatonic(float freq);
   int lastXStart, lastXEnd, lastZone;
+  float currentBaseFreq;  // Current base frequency (adjusted by base note slider)
 };
 
 #endif // PENTATONIC_UI_H
