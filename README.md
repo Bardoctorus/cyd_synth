@@ -21,16 +21,18 @@ ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM5102 
    - File → Open Folder → Select `cyd_synth` directory
 
 3. **Build and Upload**:
-   - Click the checkmark (✓) in bottom status bar to build
-   - Click the arrow (→) to upload
-   - Click the plug (🔌) to open serial monitor (115200 baud)
+   - Click the checkmark icon in bottom status bar to build
+   - Click the arrow icon to upload
+   - Click the plug icon to open serial monitor (115200 baud)
 
 ### First Run
 
 After uploading, you should see:
-- Display showing "CYD Synthesizer" and status information
-- 440Hz sine wave audio output (A4 note)
-- Touch screen responding to touches with visual feedback
+- Display showing "CYD Synthesizer" and control instructions
+- 440Hz sine wave audio output (A4 note) at full volume
+- Touch screen control:
+  - **X-axis (left-right)**: Controls pitch from 60Hz to 12kHz
+  - **Y-axis (up-down)**: Controls volume from 0% to 99%
 
 **Note**: Serial debugging uses Serial2 (not Serial) because IO1 is repurposed for I2S. The serial monitor should work automatically.
 
@@ -161,9 +163,10 @@ pio device list
 
 ## Features
 
-- **440Hz Sine Wave**: Test audio output via I²S to PCM5102 DAC
-- **Display Status**: Shows status information on TFT screen
-- **Touch Input**: Tests touchscreen functionality with visual feedback
+- **Touch-Controlled Sine Wave Generator**: Real-time pitch and volume control via touchscreen
+- **Pitch Control**: X-axis controls frequency from 60Hz to 12kHz
+- **Volume Control**: Y-axis controls amplitude from 0% to 99%
+- **Real-Time Display**: Shows current frequency, volume, and touch position
 - **FreeRTOS Tasks**: Audio processing on Core 0, UI on Core 1
 
 ## Additional Information

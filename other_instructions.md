@@ -33,9 +33,9 @@ This document contains detailed information, troubleshooting guides, and advance
 ### Building and Uploading
 
 **Method 1: PlatformIO Toolbar**
-- Build: Click checkmark (✓) in bottom status bar or `Ctrl+Alt+B`
-- Upload: Click arrow (→) or `Ctrl+Alt+U`
-- Monitor: Click plug (🔌) or `Ctrl+Alt+S`
+- Build: Click checkmark icon in bottom status bar or `Ctrl+Alt+B`
+- Upload: Click arrow icon or `Ctrl+Alt+U`
+- Monitor: Click plug icon or `Ctrl+Alt+S`
 
 **Method 2: Terminal Commands**
 ```bash
@@ -290,8 +290,8 @@ touchY = map(p.y, 240, 3800, 1, tft.height());
 ### Calibration Values
 
 These values work for most CYD boards:
-- X: 200-3700 → 1-320 (display width)
-- Y: 240-3800 → 1-240 (display height)
+- X: 200-3700 maps to 1-320 (display width)
+- Y: 240-3800 maps to 1-240 (display height)
 
 ### Adjusting Calibration
 
@@ -350,11 +350,11 @@ ts.setRotation(1);  // Should match tft.setRotation()
 ### No Audio Output
 
 **Wiring Checklist:**
-- [ ] IO1 (YellowBlack) → PCM5102 BCK
-- [ ] IO22 (Blue) → PCM5102 DIN
-- [ ] IO27 (Yellow) → PCM5102 LCK
-- [ ] GND (Black) → PCM5102 GND
-- [ ] 3.3V (Red) → PCM5102 VIN
+- [ ] IO1 (YellowBlack) to PCM5102 BCK
+- [ ] IO22 (Blue) to PCM5102 DIN
+- [ ] IO27 (Yellow) to PCM5102 LCK
+- [ ] GND (Black) to PCM5102 GND
+- [ ] 3.3V (Red) to PCM5102 VIN
 
 **Configuration Checks:**
 - [ ] I²S initialized successfully (check Serial2)
