@@ -1,33 +1,6 @@
 # CYD Synthesizer
 
-ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM1502 DAC.
-
-## Hardware
-
-- **Board**: ESP32-2432S028R (Cheap Yellow Display)
-- **DAC**: PCM1502
-- **I²S Connections**:
-  - IO21 → BCK (Bit Clock)
-  - IO22 → DIN (Data Input)
-  - IO35 → LCK (Left/Right Clock / Word Select)
-  - GND → GND
-  - 3.3V → VIN (separate power supply, grounds joined)
-
-## Project Structure
-
-```
-cyd_synth/
-├── platformio.ini          # PlatformIO configuration
-├── src/
-│   └── main.cpp            # Main application code
-├── include/
-│   └── User_Setup.h        # TFT_eSPI display configuration
-├── .gitignore              # Git ignore file
-├── README.md               # This file
-├── PLATFORMIO_SETUP.md     # PlatformIO setup and flashing instructions
-├── PIN_CONFIGURATION.md    # Pin configuration reference
-└── I2S_AUDIO_INTERFERENCE_NOTES.md  # Audio interference troubleshooting
-```
+ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM5102 DAC.
 
 ## Quick Start
 
@@ -35,74 +8,167 @@ cyd_synth/
 
 1. **Visual Studio Code** with **PlatformIO IDE** extension
 2. USB cable to connect the CYD board
-3. PCM1502 DAC wired as described above
+3. PCM5102 DAC wired as described in Pinout section below
 
-### Setup
+### Installation
 
 1. **Install PlatformIO**:
    - Open VSCode
    - Install "PlatformIO IDE" extension
    - Restart VSCode
 
-2. **Configure Display**:
-   - Edit `include/User_Setup.h` to match your CYD board's display pins
-   - Adjust driver type (ILI9341 or ST7789) if needed
-   - See `PIN_CONFIGURATION.md` for reference
+2. **Open Project**:
+   - File → Open Folder → Select `cyd_synth` directory
 
 3. **Build and Upload**:
-   - Click the checkmark (✓) to build
+   - Click the checkmark (✓) in bottom status bar to build
    - Click the arrow (→) to upload
-   - Click the plug (🔌) to open serial monitor
+   - Click the plug (🔌) to open serial monitor (115200 baud)
 
-### Detailed Instructions
+### First Run
 
-See `PLATFORMIO_SETUP.md` for comprehensive setup and flashing instructions.
+After uploading, you should see:
+- Display showing "CYD Synthesizer" and status information
+- 440Hz sine wave audio output (A4 note)
+- Touch screen responding to touches with visual feedback
 
-## Current Features
+**Note**: Serial debugging uses Serial2 (not Serial) because IO1 is repurposed for I2S. The serial monitor should work automatically.
 
-- **440Hz Sine Wave**: Test audio output via I²S to PCM1502 DAC
+## Pinout
+
+### I²S to PCM5102 DAC Wiring
+
+All connections use JST connectors P1 and CN1 (non-invasive setup):
+
+**CN1 Connector (JST1):**
+| ESP32 Pin | Wire Color | PCM5102 Pin | Signal |
+|-----------|------------|------------|--------|
+| GND       | Black      | GND        | Ground |
+| IO22      | Blue       | DIN        | Data Input |
+| IO27      | Yellow     | LCK        | Left/Right Clock |
+| 3.3V      | Red        | VIN        | Power |
+
+**P1 Connector (JST2):**
+| ESP32 Pin | Wire Color | PCM5102 Pin | Signal |
+|-----------|------------|------------|--------|
+| IO1 (TX)  | YellowBlack| BCK        | Bit Clock |
+
+**Important Notes:**
+- IO35 is INPUT ONLY - cannot be used for I2S output
+- IO21 is used for TFT backlight - conflicts with I2S
+- Speaker connector P4 cannot be used as GPIO
+- IO1 (TX) is repurposed from UART - Serial uses Serial2 instead (IO17/IO16)
+
+### Display Pins
+
+Configured in `include/User_Setup.h`:
+- TFT_MOSI: GPIO 23
+- TFT_SCLK: GPIO 18
+- TFT_CS: GPIO 15
+- TFT_DC: GPIO 2
+- TFT_RST: GPIO 4 (or -1 if connected to board RST)
+- TFT_BL: GPIO 14 (backlight, optional)
+
+### Touch Pins
+
+Configured in `src/main.cpp`:
+- XPT2046_CS: GPIO 33
+- XPT2046_IRQ: GPIO 36
+- XPT2046_CLK: GPIO 25
+- XPT2046_MOSI: GPIO 32
+- XPT2046_MISO: GPIO 39
+
+## PlatformIO Configuration
+
+### Project Structure
+
+```
+cyd_synth/
+├── platformio.ini      # PlatformIO configuration
+├── src/
+│   └── main.cpp        # Main application code
+├── include/
+│   └── User_Setup.h    # TFT_eSPI display configuration
+└── extra_scripts.py    # Auto-copies User_Setup.h to TFT_eSPI library
+```
+
+### Key Settings (platformio.ini)
+
+- **Platform**: espressif32
+- **Board**: esp32dev
+- **Framework**: arduino
+- **Serial Monitor**: 115200 baud
+- **Libraries**: 
+  - TFT_eSPI@^2.5.43
+  - XPT2046_Touchscreen
+
+### Display Configuration
+
+The `extra_scripts.py` automatically copies `include/User_Setup.h` to the TFT_eSPI library during build. Edit `include/User_Setup.h` to adjust:
+- Display driver (ILI9341 or ST7789)
+- Pin assignments
+- SPI frequency
+- Display settings
+
+### Common PlatformIO Commands
+
+```bash
+# Build project
+pio run
+
+# Upload to board
+pio run --target upload
+
+# Serial monitor
+pio device monitor
+
+# Clean build files
+pio run --target clean
+
+# List connected devices
+pio device list
+```
+
+## Troubleshooting
+
+### No Audio Output
+- Verify wiring matches pinout above (especially IO1, IO22, IO27)
+- Check power connections (3.3V Red wire and GND Black wire on CN1)
+- Ensure PCM5102 VOUT is connected to amplifier/headphones
+- Check serial monitor for I²S initialization errors
+
+### Display Not Working
+- Verify display driver in `include/User_Setup.h` (ILI9341_DRIVER or ILI9341_2_DRIVER)
+- Check pin assignments match your CYD board
+- Try different rotation values (0-3) in `src/main.cpp`
+
+### Touch Not Working
+- Verify touch pins in `src/main.cpp` (CS=33, IRQ=36)
+- Check that touchscreen SPI pins are correct (CLK=25, MOSI=32, MISO=39)
+- Touch coordinates may need calibration - adjust mapping in `src/main.cpp`
+
+### Serial Monitor Not Working
+- Code uses Serial2 (not Serial) because IO1 is repurposed for I2S
+- Serial2 uses IO17 (TX) and IO16 (RX) by default
+- PlatformIO should auto-detect - if not, check COM port settings
+
+## Code Locations
+
+- **I²S Pin Definitions**: `src/main.cpp` lines 52-55
+- **Touch Pin Definitions**: `src/main.cpp` lines 31-35
+- **Display Configuration**: `include/User_Setup.h`
+- **I²S Configuration**: `src/main.cpp` lines 166-183
+
+## Features
+
+- **440Hz Sine Wave**: Test audio output via I²S to PCM5102 DAC
 - **Display Status**: Shows status information on TFT screen
 - **Touch Input**: Tests touchscreen functionality with visual feedback
 - **FreeRTOS Tasks**: Audio processing on Core 0, UI on Core 1
 
-## Configuration
+## Additional Information
 
-### Display Pins
-
-Edit `include/User_Setup.h` to configure display pins. Common CYD board pins:
-- TFT_MOSI: 23
-- TFT_SCLK: 18
-- TFT_CS: 15
-- TFT_DC: 2
-- TFT_RST: 4
-- TFT_BL: 14 (backlight, optional)
-
-### Touch Pins
-
-Edit `src/main.cpp` to configure touch pins:
-- TOUCH_CS: 5
-- TOUCH_IRQ: 25 (optional)
-
-### I²S Pins
-
-Currently configured in `src/main.cpp`:
-- I2S_BCK_PIN: 21
-- I2S_DATA_PIN: 22
-- I2S_LRCK_PIN: 35
-
-## Troubleshooting
-
-- **Display not working**: Check `include/User_Setup.h` pin configuration
-- **Touch not working**: Check touch pin assignments in `src/main.cpp`
-- **No audio**: Check I²S wiring and power connections
-- **Audio interference**: See `I2S_AUDIO_INTERFERENCE_NOTES.md`
-
-## Documentation
-
-- `PLATFORMIO_SETUP.md`: PlatformIO setup and flashing instructions
-- `PIN_CONFIGURATION.md`: Pin configuration reference
-- `I2S_AUDIO_INTERFERENCE_NOTES.md`: Audio interference troubleshooting guide
-- `USB_FLASHING_INSTRUCTIONS.md`: Arduino IDE flashing instructions (legacy)
+For detailed troubleshooting, advanced configuration, and reference information, see `other_instructions.md`.
 
 ## Libraries
 
@@ -110,22 +176,8 @@ Currently configured in `src/main.cpp`:
 - **XPT2046_Touchscreen**: Touch input library
 - **ESP32 I²S**: Built-in ESP32 I²S driver
 
-## Development
-
-This project uses PlatformIO for development. All code is in `src/main.cpp`. The project structure follows PlatformIO conventions:
-
-- `src/`: Source code
-- `include/`: Header files (TFT_eSPI configuration)
-- `platformio.ini`: Project configuration
-- `.pio/`: Build artifacts (gitignored)
-
-## License
-
-[Add your license here]
-
 ## Credits
 
 - ESP32 Platform: Espressif Systems
 - TFT_eSPI: Bodmer
 - XPT2046_Touchscreen: Paul Stoffregen
-
