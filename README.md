@@ -6,7 +6,9 @@ Currently, Dual oscillators (Base sine, higher saw, tweakable by sliders) go thr
 
 DEMO VIDEO WILL GO HERE WHEN I CAN RECORD IT
 
-Up next is implementing envelopes for the filters and oscillators, and then deciding what should be user-facing and what should be hidden away. I can imagine a future where there's a simple version of this synth, and a more involved version with some menu diving and the possibility of choosing what controls you have on the screen, or perhaps even presets via sd card. The slot is there after all!
+It's a bit quiet, mostly as the digital clipper I have on the master out sounds horrible so I'm avoiding hitting it by keeping the signal low. I'll add some kind of soft clipping with whatever CPU is left after everything else.
+
+Up next is implementing envelopes for the filters and oscillators, and then deciding what should be user-facing and what should be hidden away. I can imagine a future where there's a simple version of this synth, and a more involved version with some menu diving and the possibility of choosing what controls you have on the screen, or perhaps even presets via SD card. The slot is there after all!
 
 ## Quick Start
 
