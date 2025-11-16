@@ -1,10 +1,12 @@
 # CYD Synthesizer
 
-ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM5102 DAC. The idea here is to try to make something that makes pretty sounds and uses the limitations of the touchscreen as a feature rather than an annoyance. I've not quite managed it, but it's getting there.
+ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM5102 DAC. The idea here is to try to make something that makes pretty sounds and uses the limitations of the touchscreen as a feature rather than an annoyance. I've not quite managed it, but it's getting there. 
 
-Currently, Dual oscillators (Base sine, higher saw, tweakable by sliders) go through a single fixed Q biquad filter, with the cutoff controlled by the vertical part of the top of the screen. The horizontal part is pentatonic (for now, more options later). The delay has a stereo offset (fixed for now) and an LFO for varying the time. The result is a not-terrible-sounding delay synth.
+Currently, Dual oscillators (Base sine, higher saw, tweakable by sliders) go through a hardcoded ASR, and a single fixed Q biquad filter, with the cutoff controlled by the vertical part of the top of the screen. The horizontal part is pentatonic (for now, more options later). The delay has a stereo offset (fixed for now) and an LFO for varying the time. The result is a not-terrible-sounding delay synth.
 
 DEMO VIDEO WILL GO HERE WHEN I CAN RECORD IT
+
+Up next is implementing envelopes for the filters and oscillators, and then deciding what should be user-facing and what should be hidden away. I can imagine a future where there's a simple version of this synth, and a more involved version with some menu diving and the possibility of choosing what controls you have on the screen, or perhaps even presets via sd card. The slot is there after all!
 
 ## Quick Start
 
@@ -229,6 +231,6 @@ For troubleshooting specific errors, see `ERROR_LOG.md`.
 
 ## Credits
 
-- ESP32 Platform: Espressif Systems
-- TFT_eSPI: Bodmer
-- XPT2046_Touchscreen: Paul Stoffregen
+- Brian Lough basically triggered my interest in this device, and [his CYD github repo]<https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display> was the genesis of this project.
+- [TFT_eSPI: Bodmer]<https://github.com/Bodmer/TFT_eSPI>
+- [XPT2046_Touchscreen: Paul Stoffregen]<https://github.com/PaulStoffregen/XPT2046_Touchscreen>
