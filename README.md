@@ -225,8 +225,8 @@ For troubleshooting specific errors, see `ERROR_LOG.md`.
 
 ## Libraries
 
-- TFT_eSPI: Display library (configured via `include/User_Setup.h`)
-- XPT2046_Touchscreen: Touch input library
+- [TFT_eSPI: Display library](https://github.com/Bodmer/TFT_eSPI) (configured via `include/User_Setup.h`)
+- [XPT2046_Touchscreen](https://github.com/PaulStoffregen/XPT2046_Touchscreen): Touch input library
 - ESP32 I2S: Built-in ESP32 I2S driver
 
 ## Credits
