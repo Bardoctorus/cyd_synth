@@ -39,7 +39,7 @@ After uploading, you should see:
   - Top half Y-axis: Controls low-pass filter cutoff
   - Bottom half: Parameter sliders for delay, LFO, base tone, and upper tone
 
-Note: Serial debugging uses Serial2 (not Serial) because IO1 is repurposed for I2S. The serial monitor should work automatically.
+Note: Serial debugging uses Serial2 (not Serial) because IO1 is repurposed for I2S. This probably isn't something you'll run in to though, USB serial works as normal and the serial monitor should work automatically.
 
 ## Pinout
 
