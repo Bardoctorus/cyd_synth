@@ -6,21 +6,21 @@ ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM5102 
 
 ### Prerequisites
 
-1. **Visual Studio Code** with **PlatformIO IDE** extension
+1. Visual Studio Code with PlatformIO IDE extension
 2. USB cable to connect the CYD board
 3. PCM5102 DAC wired as described in Pinout section below
 
 ### Installation
 
-1. **Install PlatformIO**:
+1. Install PlatformIO:
    - Open VSCode
    - Install "PlatformIO IDE" extension
    - Restart VSCode
 
-2. **Open Project**:
+2. Open Project:
    - File → Open Folder → Select `cyd_synth` directory
 
-3. **Build and Upload**:
+3. Build and Upload:
    - Click the checkmark icon in bottom status bar to build
    - Click the arrow icon to upload
    - Click the plug icon to open serial monitor (115200 baud)
@@ -28,34 +28,35 @@ ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM5102 
 ### First Run
 
 After uploading, you should see:
-- Display showing "CYD Synthesizer" and control instructions
-- 440Hz sine wave audio output (A4 note) at full volume
+- Display showing pentatonic scale zones in the top half
+- Parameter controls in the bottom half
 - Touch screen control:
-  - **X-axis (left-right)**: Controls pitch from 60Hz to 12kHz
-  - **Y-axis (up-down)**: Controls volume from 0% to 99%
+  - Top half X-axis: Controls pitch (quantized to pentatonic scale)
+  - Top half Y-axis: Controls low-pass filter cutoff
+  - Bottom half: Parameter sliders for delay, LFO, base tone, and upper tone
 
-**Note**: Serial debugging uses Serial2 (not Serial) because IO1 is repurposed for I2S. The serial monitor should work automatically.
+Note: Serial debugging uses Serial2 (not Serial) because IO1 is repurposed for I2S. The serial monitor should work automatically.
 
 ## Pinout
 
-### I²S to PCM5102 DAC Wiring
+### I2S to PCM5102 DAC Wiring
 
 All connections use JST connectors P1 and CN1 (non-invasive setup):
 
-**CN1 Connector (JST1):**
+CN1 Connector (JST1):
 | ESP32 Pin | Wire Color | PCM5102 Pin | Signal |
-|-----------|------------|------------|--------|
+|-----------|------------|-------------|--------|
 | GND       | Black      | GND        | Ground |
 | IO22      | Blue       | DIN        | Data Input |
 | IO27      | Yellow     | LCK        | Left/Right Clock |
 | 3.3V      | Red        | VIN        | Power |
 
-**P1 Connector (JST2):**
+P1 Connector (JST2):
 | ESP32 Pin | Wire Color | PCM5102 Pin | Signal |
-|-----------|------------|------------|--------|
+|-----------|------------|-------------|--------|
 | IO1 (TX)  | YellowBlack| BCK        | Bit Clock |
 
-**Important Notes:**
+Important Notes:
 - IO35 is INPUT ONLY - cannot be used for I2S output
 - IO21 is used for TFT backlight - conflicts with I2S
 - Speaker connector P4 cannot be used as GPIO
@@ -73,7 +74,7 @@ Configured in `include/User_Setup.h`:
 
 ### Touch Pins
 
-Configured in `src/main.cpp`:
+Configured in `src/config.h`:
 - XPT2046_CS: GPIO 33
 - XPT2046_IRQ: GPIO 36
 - XPT2046_CLK: GPIO 25
@@ -88,19 +89,23 @@ Configured in `src/main.cpp`:
 cyd_synth/
 ├── platformio.ini      # PlatformIO configuration
 ├── src/
-│   └── main.cpp        # Main application code
+│   ├── main.cpp        # Main application code
+│   ├── config.h        # Centralized configuration
+│   ├── hardware/       # Hardware abstraction modules
+│   ├── audio/          # Audio processing modules
+│   └── ui/             # User interface modules
 ├── include/
-│   └── User_Setup.h    # TFT_eSPI display configuration
+│   └── User_Setup.h     # TFT_eSPI display configuration
 └── extra_scripts.py    # Auto-copies User_Setup.h to TFT_eSPI library
 ```
 
 ### Key Settings (platformio.ini)
 
-- **Platform**: espressif32
-- **Board**: esp32dev
-- **Framework**: arduino
-- **Serial Monitor**: 115200 baud
-- **Libraries**: 
+- Platform: espressif32
+- Board: esp32dev
+- Framework: arduino
+- Serial Monitor: 115200 baud
+- Libraries: 
   - TFT_eSPI@^2.5.43
   - XPT2046_Touchscreen
 
@@ -131,13 +136,43 @@ pio run --target clean
 pio device list
 ```
 
+## Features
+
+### Audio Generation
+- Dual oscillator: Sine wave + Sawtooth wave
+- Pentatonic scale quantization (5 notes per octave)
+- ADSR envelope with smooth attack and release
+- Low-pass filter with resonance (Q control)
+- Stereo delay effect with LFO modulation
+- Variable sawtooth interval (5, 7, 9, 12, or 14 semitones above sine)
+
+### Controls
+
+Top Half of Screen:
+- X-axis: Pitch control (quantized to pentatonic scale, 80Hz to 2kHz)
+- Y-axis: Low-pass filter cutoff (40Hz to 4kHz)
+
+Bottom Half of Screen (5 Parameter Sliders):
+- Delay Time: 50ms to 1000ms (logarithmic)
+- LFO Depth: 0ms to 100ms (modulates delay time)
+- LFO Speed: 0.1Hz to 50Hz (logarithmic)
+- Base Tone: 5 detents (whole tone steps, shifts entire scale)
+- Upper Tone: 5 detents (sawtooth interval: 5, 7, 9, 12, 14 semitones)
+
+### Technical Details
+- Sample Rate: 44100 Hz
+- Audio Processing: Core 0 (FreeRTOS task)
+- UI Processing: Core 1 (main loop)
+- Delay Sample Rate: 22050 Hz (configurable, saves memory)
+- Thread-safe: Volatile variables for inter-core communication
+
 ## Troubleshooting
 
 ### No Audio Output
 - Verify wiring matches pinout above (especially IO1, IO22, IO27)
 - Check power connections (3.3V Red wire and GND Black wire on CN1)
 - Ensure PCM5102 VOUT is connected to amplifier/headphones
-- Check serial monitor for I²S initialization errors
+- Check serial monitor for I2S initialization errors
 
 ### Display Not Working
 - Verify display driver in `include/User_Setup.h` (ILI9341_DRIVER or ILI9341_2_DRIVER)
@@ -145,39 +180,40 @@ pio device list
 - Try different rotation values (0-3) in `src/main.cpp`
 
 ### Touch Not Working
-- Verify touch pins in `src/main.cpp` (CS=33, IRQ=36)
+- Verify touch pins in `src/config.h` (CS=33, IRQ=36)
 - Check that touchscreen SPI pins are correct (CLK=25, MOSI=32, MISO=39)
-- Touch coordinates may need calibration - adjust mapping in `src/main.cpp`
+- Touch coordinates may need calibration - adjust mapping in `src/hardware/touch.cpp`
 
 ### Serial Monitor Not Working
 - Code uses Serial2 (not Serial) because IO1 is repurposed for I2S
 - Serial2 uses IO17 (TX) and IO16 (RX) by default
 - PlatformIO should auto-detect - if not, check COM port settings
 
+### Build Errors
+- See `ERROR_LOG.md` for common build errors and solutions
+- Ensure `platformio.ini` does NOT have `-DUSER_SETUP_LOADED=1` flag
+- Check that `extra_scripts.py` is running (should see it in build output)
+
 ## Code Locations
 
-- **I²S Pin Definitions**: `src/main.cpp` lines 52-55
-- **Touch Pin Definitions**: `src/main.cpp` lines 31-35
-- **Display Configuration**: `include/User_Setup.h`
-- **I²S Configuration**: `src/main.cpp` lines 166-183
-
-## Features
-
-- **Touch-Controlled Sine Wave Generator**: Real-time pitch and volume control via touchscreen
-- **Pitch Control**: X-axis controls frequency from 60Hz to 12kHz
-- **Volume Control**: Y-axis controls amplitude from 0% to 99%
-- **Real-Time Display**: Shows current frequency, volume, and touch position
-- **FreeRTOS Tasks**: Audio processing on Core 0, UI on Core 1
+- Configuration: `src/config.h`
+- I2S Pin Definitions: `src/config.h`
+- Touch Pin Definitions: `src/config.h`
+- Display Configuration: `include/User_Setup.h`
+- Main Application: `src/main.cpp`
+- Architecture Details: `ARCHITECTURE.md`
 
 ## Additional Information
 
-For detailed troubleshooting, advanced configuration, and reference information, see `other_instructions.md`.
+For detailed architecture, signal flow, and module descriptions, see `ARCHITECTURE.md`.
+
+For troubleshooting specific errors, see `ERROR_LOG.md`.
 
 ## Libraries
 
-- **TFT_eSPI**: Display library (configured via `include/User_Setup.h`)
-- **XPT2046_Touchscreen**: Touch input library
-- **ESP32 I²S**: Built-in ESP32 I²S driver
+- TFT_eSPI: Display library (configured via `include/User_Setup.h`)
+- XPT2046_Touchscreen: Touch input library
+- ESP32 I2S: Built-in ESP32 I2S driver
 
 ## Credits
 
