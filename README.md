@@ -1,6 +1,10 @@
 # CYD Synthesizer
 
-ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM5102 DAC.
+ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM5102 DAC. The idea here is to try to make something that makes pretty sounds and uses the limitations of the touchscreen as a feature rather than an annoyance. I've not quite managed it, but it's getting there.
+
+Currently, Dual oscillators (Base sine, higher saw, tweakable by sliders) go through a single fixed Q biquad filter, with the cutoff controlled by the vertical part of the top of the screen. The horizontal part is pentatonic (for now, more options later). The delay has a stereo offset (fixed for now) and an LFO for varying the time. The result is a not-terrible-sounding delay synth.
+
+DEMO VIDEO WILL GO HERE WHEN I CAN RECORD IT
 
 ## Quick Start
 
@@ -8,7 +12,7 @@ ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM5102 
 
 1. Visual Studio Code with PlatformIO IDE extension
 2. USB cable to connect the CYD board
-3. PCM5102 DAC wired as described in Pinout section below
+3. PCM5102 DAC wired as described in the Pinout section below
 
 ### Installation
 
