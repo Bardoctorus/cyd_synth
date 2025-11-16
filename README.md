@@ -113,6 +113,14 @@ cyd_synth/
   - TFT_eSPI@^2.5.43
   - XPT2046_Touchscreen
 
+  *Note*: That I had to put the full github address of the touchscreen library into my platformio.ini before it could find the library, i.e:
+
+  ```bash
+  lib_deps = 
+    bodmer/TFT_eSPI@^2.5.43
+    https://github.com/PaulStoffregen/XPT2046_Touchscreen.git
+  ```
+
 ### Display Configuration
 
 The `extra_scripts.py` automatically copies `include/User_Setup.h` to the TFT_eSPI library during build. Edit `include/User_Setup.h` to adjust:
