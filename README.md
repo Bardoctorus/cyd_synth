@@ -231,6 +231,6 @@ For troubleshooting specific errors, see `ERROR_LOG.md`.
 
 ## Credits
 
-- Brian Lough basically triggered my interest in this device, and [his CYD github repo]<https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display> was the genesis of this project.
-- [TFT_eSPI: Bodmer]<https://github.com/Bodmer/TFT_eSPI>
-- [XPT2046_Touchscreen: Paul Stoffregen]<https://github.com/PaulStoffregen/XPT2046_Touchscreen>
+- Brian Lough basically triggered my interest in this device, and [his CYD github repo](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display) was the genesis of this project.
+- [TFT_eSPI: Bodmer](https://github.com/Bodmer/TFT_eSPI)
+- [XPT2046_Touchscreen: Paul Stoffregen](https://github.com/PaulStoffregen/XPT2046_Touchscreen)
