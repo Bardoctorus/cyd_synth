@@ -1,6 +1,8 @@
 # Error Log - CYD Synthesizer Project
 
-This document catalogs all errors encountered during development, their causes, and the fixes applied.
+This document catalogs all errors encountered during development, their causes, and the fixes applied. 
+
+**This will probably get deleted, it's just a neat summary of things that went wrong while getting up and running**
 
 ---
 
