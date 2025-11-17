@@ -4,7 +4,9 @@ ESP32-based synthesizer using the Cheap Yellow Display (CYD) board with PCM5102 
 
 Currently, Dual oscillators (Base sine, higher saw, tweakable by sliders) go through a hardcoded ASR, and a single fixed Q biquad filter, with the cutoff controlled by the vertical part of the top of the screen. The horizontal part is pentatonic (for now, more options later). The delay has a stereo offset (fixed for now) and an LFO for varying the time. The result is a not-terrible-sounding delay synth.
 
-DEMO VIDEO WILL GO HERE WHEN I CAN RECORD IT
+**Click the image to watch a demo.** *Y no embed github?*
+
+[![An image of the CYD synth that links to a YouTube demo when clicked](https://img.youtube.com/vi/4BFLPl4RwkQ/0.jpg)](https://www.youtube.com/watch?v=4BFLPl4RwkQ)
 
 It's a bit quiet, mostly as the digital clipper I have on the master out sounds horrible so I'm avoiding hitting it by keeping the signal low. I'll add some kind of soft clipping with whatever CPU is left after everything else.
 
