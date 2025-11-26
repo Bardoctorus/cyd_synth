@@ -7,9 +7,10 @@
 #define CONFIG_H
 
 #include <math.h>
-#ifndef PI
-#define PI 3.14159265358979323846
+#ifdef PI
+#undef PI
 #endif
+#define PI 3.14159265358979323846
 
 // Audio parameters
 #define SAMPLE_RATE     44100
@@ -40,6 +41,8 @@ const float UPPER_TONE_SEMITONES[5] = {5.0, 7.0, 9.0, 12.0, 14.0};
 #define DELAY_TIME_VARIANCE_MS_MIN 20.0  // Minimum stereo variance (ms)
 #define DELAY_TIME_VARIANCE_MS_MAX 200.0 // Maximum stereo variance (ms)
 #define DELAY_FEEDBACK   0.6    // Feedback level (60%)
+#define DELAY_FEEDBACK_MIN 0.01  // Minimum feedback (1%)
+#define DELAY_FEEDBACK_MAX 1.0   // Maximum feedback (100%)
 #define DELAY_TIME_VARIANCE_MS 45.0  // Stereo width: time difference between L and R channels
 #define DELAY_SEND_LEVEL 0.3    // Send level: how much of the filtered instrument goes to delay (0.0 to 1.0)
 
@@ -74,7 +77,10 @@ const float UPPER_TONE_SEMITONES[5] = {5.0, 7.0, 9.0, 12.0, 14.0};
 // Display parameters
 #define DEAD_ZONE_SIZE  20  // Pixels from top/bottom for dead zones
 #define DISPLAY_UPDATE_INTERVAL 50  // Update display every 50ms for snappier response
-#define STATIC_REDRAW_INTERVAL 2000  // Redraw static elements every 2 seconds
+#define STATIC_REDRAW_INTERVAL 200  // Redraw static elements every 2 seconds
+#define MENU_BUTTON_WIDTH 24  // Width of vertical menu button strip at bottom left (tappable area)
+// Fixed per-fader strip width for bottom controls (compact layout, leaves empty space on right)
+#define FADER_STRIP_WIDTH 26
 
 // Pentatonic scale intervals (frequency ratios)
 // Pentatonic: Root, Minor 3rd, Perfect 4th, Perfect 5th, Minor 7th

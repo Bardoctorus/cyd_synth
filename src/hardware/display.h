@@ -19,9 +19,13 @@ public:
   // Access to underlying TFT for advanced operations
   TFT_eSPI& getTFT() { return tft; }
   
+  // Check if coordinates are in menu button area (to avoid conflicts)
+  bool isInMenuButtonArea(int x, int y);
+  
 private:
   TFT_eSPI tft;
   unsigned long lastStaticRedraw;
+  int menuButtonX, menuButtonY, menuButtonWidth, menuButtonHeight;
 };
 
 #endif // DISPLAY_H

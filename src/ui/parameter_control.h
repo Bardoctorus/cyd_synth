@@ -10,10 +10,11 @@
 
 enum ParameterType {
   PARAM_DELAY_TIME = 0,
-  PARAM_LFO_DEPTH = 1,
-  PARAM_LFO_SPEED = 2,
-  PARAM_BASE_NOTE = 3,
-  PARAM_UPPER_TONE = 4,
+  PARAM_DELAY_FEEDBACK = 1,
+  PARAM_LFO_DEPTH = 2,
+  PARAM_LFO_SPEED = 3,
+  PARAM_BASE_NOTE = 4,
+  PARAM_UPPER_TONE = 5,
   NUM_PARAMETERS
 };
 
@@ -25,6 +26,7 @@ public:
   // Vertical sliders: touchY controls value, touchX determines which parameter
   ParameterType touchToParameter(int touchX, int touchY, int screenWidth, int screenHeight);
   float touchToDelayTime(int touchY, int screenHeight);
+  float touchToDelayFeedback(int touchY, int screenHeight);
   float touchToLFODepth(int touchY, int screenHeight);
   float touchToLFOSpeed(int touchY, int screenHeight);
   int touchToBaseNote(int touchY, int screenHeight);  // Returns detent index (0-4)
@@ -32,6 +34,7 @@ public:
   
   // Get smoothed values (for display)
   float getSmoothedDelayTime() { return smoothedDelayTime; }
+  float getSmoothedDelayFeedback() { return smoothedDelayFeedback; }
   float getSmoothedLFODepth() { return smoothedLFODepth; }
   float getSmoothedLFOSpeed() { return smoothedLFOSpeed; }
   int getBaseNoteDetent() { return currentBaseNoteDetent; }
@@ -51,6 +54,7 @@ public:
   
 private:
   float smoothedDelayTime;  // Smoothed value for UI display
+  float smoothedDelayFeedback; // Smoothed delay feedback for UI display
   float smoothedLFODepth;    // Smoothed LFO depth for UI display
   float smoothedLFOSpeed;    // Smoothed LFO speed for UI display
   int currentBaseNoteDetent;  // Current base note detent (0-4)

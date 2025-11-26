@@ -6,6 +6,9 @@
 #include "../config.h"
 #include <math.h>
 
+// Forward declaration for visual key count helper
+static int getTotalVisualKeys();
+
 PentatonicUI::PentatonicUI() : lastXStart(-1), lastXEnd(-1), lastZone(-1), currentBaseFreq(MIN_FREQ_BASE) {
 }
 
@@ -43,24 +46,33 @@ float PentatonicUI::quantizeToPentatonic(float freq) {
   return octaveFreq * PENTATONIC_RATIOS[closestZone];
 }
 
-float PentatonicUI::touchToFrequency(int touchX, int screenWidth) {
-  // Map linear touch position to logarithmic frequency range
-  float xPos = map(touchX, 0, screenWidth - 1, 0, 100);
-  xPos = constrain(xPos, 0, 100);
-  
-  // Logarithmic scaling: convert linear 0-100 to logarithmic frequency
-  // Use current base frequency instead of MIN_FREQ
-  float logMin = log10(currentBaseFreq);
-  float logMax = log10(MAX_FREQ);
-  float logRange = logMax - logMin;
-  
-  // Map linear position to logarithmic frequency
-  float logFreq = logMin + (xPos / 100.0) * logRange;
-  float rawFreq = pow(10.0, logFreq);
-  rawFreq = constrain(rawFreq, currentBaseFreq, MAX_FREQ);
-  
-  // Quantize to nearest pentatonic note
-  return quantizeToPentatonic(rawFreq);
+int PentatonicUI::getTotalKeys(int /*screenWidth*/) {
+  // Total keys are determined purely by the frequency range and pentatonic ratios
+  return getTotalVisualKeys();
+}
+
+int PentatonicUI::touchToKeyIndex(int touchX, int screenWidth) {
+  int totalKeys = getTotalVisualKeys();
+  if (totalKeys <= 0 || screenWidth <= 0) return 0;
+  // Map touch position linearly across the available keys
+  int keyIndex = (touchX * totalKeys) / screenWidth;
+  if (keyIndex < 0) keyIndex = 0;
+  if (keyIndex >= totalKeys) keyIndex = totalKeys - 1;
+  return keyIndex;
+}
+
+float PentatonicUI::keyIndexToFrequency(int keyIndex) {
+  if (keyIndex < 0) keyIndex = 0;
+  int totalKeys = getTotalVisualKeys();
+  if (totalKeys <= 0) return currentBaseFreq;
+  if (keyIndex >= totalKeys) keyIndex = totalKeys - 1;
+
+  // Map key index to octave and pentatonic zone, then apply currentBaseFreq
+  int octave = keyIndex / NUM_PENTATONIC_ZONES;
+  int zone = keyIndex % NUM_PENTATONIC_ZONES;
+
+  float octaveFreq = currentBaseFreq * pow(2.0, octave);
+  return octaveFreq * PENTATONIC_RATIOS[zone];
 }
 
 float PentatonicUI::touchToFilterCutoff(int touchY, int screenHeight) {
@@ -89,86 +101,39 @@ float PentatonicUI::touchToFilterCutoff(int touchY, int screenHeight) {
   return constrain(filterCutoff, FILTER_MIN_CUTOFF, FILTER_MAX_CUTOFF);
 }
 
-int PentatonicUI::getZone(float frequency) {
-  // Find which octave we're in
-  float octaveNum = log(frequency / currentBaseFreq) / log(2.0);
-  int octave = (int)octaveNum;
-  float octaveFreq = currentBaseFreq * pow(2.0, octave);
-  
-  // Find which pentatonic interval within this octave
-  float ratio = frequency / octaveFreq;
-  
-  // Find closest pentatonic ratio
-  int closestZone = 0;
-  float minDiff = fabs(ratio - PENTATONIC_RATIOS[0]);
-  
-  for (int i = 1; i < NUM_PENTATONIC_ZONES; i++) {
-    float diff = fabs(ratio - PENTATONIC_RATIOS[i]);
-    if (diff < minDiff) {
-      minDiff = diff;
-      closestZone = i;
+// Helper: compute total number of visual pentatonic "keys" between MIN_FREQ and MAX_FREQ
+static int getTotalVisualKeys() {
+  float numOctaves = log(MAX_FREQ / MIN_FREQ) / log(2.0);
+  int maxOctave = (int)numOctaves;
+  int totalKeys = 0;
+
+  for (int octave = 0; octave <= maxOctave; octave++) {
+    for (int zone = 0; zone < NUM_PENTATONIC_ZONES; zone++) {
+      float baseFreq = MIN_FREQ * pow(2.0, octave);
+      float zoneFreq = baseFreq * PENTATONIC_RATIOS[zone];
+      if (zoneFreq > MAX_FREQ) {
+        break;
+      }
+      totalKeys++;
     }
   }
-  
-  // Also check next octave's root
-  if (fabs(ratio - 2.0) < minDiff) {
-    return 0;  // Next octave root
-  }
-  
-  return closestZone;
+  return totalKeys;
 }
 
-PentatonicZone PentatonicUI::getZoneBounds(float frequency, int screenWidth) {
-  PentatonicZone zone;
-  zone.zoneIndex = getZone(frequency);
-  
-  // Calculate zone boundaries
-  float octaveNum = log(frequency / currentBaseFreq) / log(2.0);
-  int octave = (int)octaveNum;
-  float octaveFreq = currentBaseFreq * pow(2.0, octave);
-  
-  float zoneStartFreq = octaveFreq * PENTATONIC_RATIOS[zone.zoneIndex];
-  float zoneEndFreq;
-  
-  // Find the next pentatonic note (could be in same octave or next)
-  if (zone.zoneIndex < NUM_PENTATONIC_ZONES - 1) {
-    zoneEndFreq = octaveFreq * PENTATONIC_RATIOS[zone.zoneIndex + 1];
-  } else {
-    // Last note in octave, next is root of next octave
-    zoneEndFreq = octaveFreq * 2.0;
-  }
-  
-  // Ensure boundaries are within our range
-    zoneStartFreq = constrain(zoneStartFreq, currentBaseFreq, MAX_FREQ);
-    zoneEndFreq = constrain(zoneEndFreq, currentBaseFreq, MAX_FREQ);
-  
-  // Convert to screen positions (logarithmic)
-  float logMin = log10(currentBaseFreq);
-  float logMax = log10(MAX_FREQ);
-  float logStart = log10(zoneStartFreq);
-  float logEnd = log10(zoneEndFreq);
-  zone.xStart = (int)(((logStart - logMin) / (logMax - logMin)) * screenWidth);
-  zone.xEnd = (int)(((logEnd - logMin) / (logMax - logMin)) * screenWidth);
-  zone.xStart = constrain(zone.xStart, 0, screenWidth - 1);
-  zone.xEnd = constrain(zone.xEnd, 0, screenWidth - 1);
-  
-  // Ensure xEnd >= xStart
-  if (zone.xEnd < zone.xStart) {
-    int temp = zone.xStart;
-    zone.xStart = zone.xEnd;
-    zone.xEnd = temp;
-  }
-  
-  return zone;
-}
+void PentatonicUI::updateDisplay(TFT_eSPI& tft, bool touching, int keyIndex) {
+  if (touching && keyIndex >= 0) {
+    int totalKeys = getTotalVisualKeys();
+    if (totalKeys <= 0) return;
 
-void PentatonicUI::updateDisplay(TFT_eSPI& tft, bool touching, int zoneIndex, float frequency) {
-  if (touching && zoneIndex >= 0) {
-    // Get zone bounds for this frequency
-    PentatonicZone zone = getZoneBounds(frequency, tft.width());
+    int width = tft.width();
+    PentatonicZone zone;
+    zone.zoneIndex = keyIndex;
+    zone.xStart = (keyIndex * width) / totalKeys;
+    zone.xEnd = ((keyIndex + 1) * width) / totalKeys - 1;
+    if (zone.xEnd < zone.xStart) zone.xEnd = zone.xStart;
     
     // Only update if zone changed
-    if (lastXStart != zone.xStart || lastXEnd != zone.xEnd || lastZone != zoneIndex) {
+    if (lastXStart != zone.xStart || lastXEnd != zone.xEnd || lastZone != keyIndex) {
       // Erase old highlight: fill with black and redraw dark green outline (top half only)
       int controlAreaHeight = tft.height() / 2;
       if (lastXStart >= 0 && lastXEnd >= 0) {
@@ -192,7 +157,7 @@ void PentatonicUI::updateDisplay(TFT_eSPI& tft, bool touching, int zoneIndex, fl
       
       lastXStart = zone.xStart;
       lastXEnd = zone.xEnd;
-      lastZone = zoneIndex;
+      lastZone = keyIndex;
     }
   } else {
     // Not touching - erase highlight and restore dark green outline (top half only)

@@ -224,14 +224,30 @@ void StereoDelay::writeDelay(float input) {
   }
 }
 
-void StereoDelay::process(float inputLeft, float inputRight, float& outputLeft, float& outputRight, float delayTimeMs, float delayVarianceMs) {
+void StereoDelay::reset() {
+  if (!delayBuffer) return;
+  // Clear the entire delay buffer and reset indices and state so all tails are removed
+  memset(delayBuffer, 0, DELAY_BUFFER_SIZE * sizeof(int16_t));
+  delayWriteIndex = 0;
+  delayReadPosLeft = 0.0f;
+  delayReadPosRight = 0.0f;
+  delayReadSpeedLeft = 1.0f;
+  delayReadSpeedRight = 1.0f;
+  delayWriteCounter = 0;
+  delayReadCounterLeft = 0;
+  delayReadCounterRight = 0;
+  delayReadLastLeft = 0.0f;
+  delayReadLastRight = 0.0f;
+}
+
+void StereoDelay::process(float inputLeft, float inputRight, float& outputLeft, float& outputRight, float delayTimeMs, float delayVarianceMs, float feedback) {
   // Read delayed signals from buffer (with stereo width and variable delay time) - delay return (no filter)
   readDelay(outputLeft, outputRight, delayTimeMs, delayVarianceMs);
   
   // Mix filtered instrument with feedback from delay (feedback continues even when not touching)
   // Use average of left and right for mono feedback
   float delayFeedback = (outputLeft + outputRight) / 2.0;
-  float delayInput = (inputLeft * DELAY_SEND_LEVEL) + (delayFeedback * DELAY_FEEDBACK);
+  float delayInput = (inputLeft * DELAY_SEND_LEVEL) + (delayFeedback * feedback);
   
   // Write to delay buffer
   writeDelay(delayInput);

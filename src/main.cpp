@@ -29,6 +29,8 @@
 #include "audio/adsr.h"
 #include "ui/pentatonic_ui.h"
 #include "ui/parameter_control.h"
+#include "ui/menu.h"
+#include "config/settings.h"
 
 // Global hardware instances
 Display display;
@@ -42,6 +44,11 @@ LFO delayLFO;  // LFO for modulating delay time
 ADSR envelope;  // ADSR envelope for smooth note transitions
 PentatonicUI pentatonicUI;
 ParameterControl parameterControl;
+Menu menu;  // Menu system
+Settings settings;  // Global settings (for future use)
+
+// Forward declaration for main screen drawing helper
+void drawMainScreen();
 
 // Audio generation state - volatile for thread safety (read by audio task)
 volatile float currentFreq = 440.0;
@@ -61,6 +68,12 @@ volatile int currentBaseNoteDetent = BASE_NOTE_DEFAULT;     // Base note detent 
 volatile int targetBaseNoteDetent = BASE_NOTE_DEFAULT;     // Target base note detent (from touch input)
 volatile int currentUpperToneDetent = UPPER_TONE_DEFAULT;  // Upper tone detent (0-4)
 volatile int targetUpperToneDetent = UPPER_TONE_DEFAULT;  // Target upper tone detent (from touch input)
+volatile float currentDelayFeedback = DELAY_FEEDBACK;      // Runtime delay feedback (0.01 - 1.0)
+
+// Master volume for panic button (1.0 = full volume, 0.0 = silence)
+volatile float masterVolumeCurrent = 1.0f;
+volatile float masterVolumeTarget = 1.0f;
+volatile float lastUserVolume = 1.0f;  // Volume to restore to after panic
 
 // FreeRTOS task handle
 TaskHandle_t audioTaskHandle = NULL;
@@ -91,6 +104,7 @@ void audioTask(void *parameter) {
     float cutoff = currentFilterCutoff;
     bool touching = isTouching;
     float delayVariance = currentDelayVarianceMs;
+    float delayFeedback = currentDelayFeedback;
     
     // Smooth delay time changes (gradual transition to prevent clicks)
     // Smoothing rate: 0.01 means 1% per sample toward target (very smooth, ~100ms transition)
@@ -147,7 +161,20 @@ void audioTask(void *parameter) {
       lastUpperToneDetent = currentUpperToneDetent;
     }
     
+    // Smooth master volume toward target (panic button ramp), linear over ~0.1s
+    float volume = masterVolumeCurrent;
+    float volumeTarget = masterVolumeTarget;
+    float volumeStep = 1.0f / (0.1f * SAMPLE_RATE);  // ~0.000226 for 0.1s ramp
+
     for (int i = 0; i < 64; i++) {
+      // Update volume toward target each sample
+      if (volume > volumeTarget) {
+        volume -= volumeStep;
+        if (volume < volumeTarget) volume = volumeTarget;
+      } else if (volume < volumeTarget) {
+        volume += volumeStep;
+        if (volume > volumeTarget) volume = volumeTarget;
+      }
       // STEP 1: Generate instrument signal (always generate, envelope will control amplitude)
       // Note: freq is already quantized to pentatonic scale with current base frequency
       // Always generate (even when not touching) so phases stay continuous - envelope handles amplitude
@@ -164,7 +191,7 @@ void audioTask(void *parameter) {
       // STEP 3 & 4: Process delay (send filtered instrument, get delay return)
       // Pass runtime-controllable delay time and variance
       float delayReturnLeft, delayReturnRight;
-      stereoDelay.process(filteredInstrumentLeft, filteredInstrumentRight, delayReturnLeft, delayReturnRight, delayTime, delayVariance);
+      stereoDelay.process(filteredInstrumentLeft, filteredInstrumentRight, delayReturnLeft, delayReturnRight, delayTime, delayVariance, delayFeedback);
       
       // STEP 5: Mix filtered instrument (dry, only when touching) + delay return (always) -> master output
       float masterLeft = filteredInstrumentLeft + delayReturnLeft;
@@ -172,8 +199,8 @@ void audioTask(void *parameter) {
       
       // Apply master gain reduction to prevent excessive peaks (gain staging)
       // This reduces the signal level before the final limiter to avoid harsh clipping
-      masterLeft *= MASTER_GAIN;
-      masterRight *= MASTER_GAIN;
+      masterLeft *= MASTER_GAIN * volume;
+      masterRight *= MASTER_GAIN * volume;
       
       // STEP 6: Apply hard limiter (safety protection, should rarely trigger with proper gain staging)
       masterLeft = constrain(masterLeft, -1.0, 1.0);
@@ -183,6 +210,9 @@ void audioTask(void *parameter) {
       audioBuffer[i * 2] = (int16_t)(masterLeft * FIXED_AMPLITUDE);
       audioBuffer[i * 2 + 1] = (int16_t)(masterRight * FIXED_AMPLITUDE);
     }
+
+    // Store current volume back to shared state
+    masterVolumeCurrent = volume;
     
     // Send buffer to I²S (128 samples * 2 bytes = 256 bytes)
     audio.writeBuffer(audioBuffer, 128);
@@ -199,6 +229,20 @@ void audioTask(void *parameter) {
     // No delay - PCM5102 needs continuous data stream
     // The I2S driver handles timing internally
   }
+}
+
+// Draw the main performance screen (keyboard and sliders)
+// Call this after anything does a full-screen clear, such as closing the menu
+void drawMainScreen() {
+  // Redraw static elements in the top half (pentatonic zones, divider, status text)
+  display.redrawStaticElements();
+
+  // Redraw parameter controls in the bottom half
+  parameterControl.drawControls(display.getTFT());
+
+  // Ensure the menu button is visible on top of the bottom UI
+  menu.drawButton(display.getTFT());
+  menu.drawPanicButton(display.getTFT());
 }
 
 void setup() {
@@ -218,6 +262,9 @@ void setup() {
   // Draw parameter controls in bottom half
   parameterControl.drawControls(display.getTFT());
   
+  // Initialize menu (draws menu button)
+  menu.init(display.getTFT());
+  
   // Initialize touch screen
   Serial2.println("Initializing touch screen...");
   Serial2.printf("Touch pins: CS=%d, IRQ=%d, MOSI=%d, MISO=%d, CLK=%d\n", 
@@ -229,10 +276,22 @@ void setup() {
   Serial2.println("Initializing I²S for PCM5102...");
   if (!audio.init()) {
     Serial2.println("I²S initialization failed!");
-    display.getTFT().setCursor(10, 80);
-    display.getTFT().setTextColor(TFT_RED);
-    display.getTFT().println("I2S ERROR!");
-    while (1) delay(1000);
+    TFT_eSPI& tft = display.getTFT();
+    // Clear screen to solid black and show only the error message
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.setTextSize(2);
+    // Center-ish error text
+    int centerX = tft.width() / 2;
+    int centerY = tft.height() / 2;
+    const char* msg = "I2S failed to start";
+    int textWidth = strlen(msg) * 6 * 2; // 6 pixels per char * textSize 2
+    tft.setCursor(centerX - textWidth / 2, centerY);
+    tft.print(msg);
+    // Halt execution so the error screen stays visible
+    while (1) {
+      delay(1000);
+    }
   }
   
   Serial2.println("I²S initialized and started successfully");
@@ -244,10 +303,6 @@ void setup() {
   filterRight.setCutoff(FILTER_MIN_CUTOFF);
   Serial2.printf("Low-pass filter initialized: Cutoff=%.0f Hz, Q=%.3f, GainComp=%.2f\n", 
                 FILTER_MIN_CUTOFF, FILTER_Q, FILTER_GAIN_COMP);
-  
-  display.getTFT().setCursor(10, 100);
-  display.getTFT().setTextColor(TFT_GREEN);
-  display.getTFT().println("I2S: OK");
   
   // Create audio task on Core 0 (high priority)
   xTaskCreatePinnedToCore(
@@ -261,9 +316,6 @@ void setup() {
   );
   
   Serial2.println("Audio task created on Core 0");
-  display.getTFT().setCursor(10, 120);
-  display.getTFT().setTextColor(TFT_GREEN);
-  display.getTFT().println("Audio: RUNNING");
   
   delay(500);
   
@@ -281,35 +333,79 @@ void loop() {
   int screenHeight = display.getTFT().height();
   int screenWidth = display.getTFT().width();
   int controlAreaHeight = screenHeight / 2;
+  
+  // Check if menu is open
+  if (menu.getState() == MENU_OPEN) {
+    // Menu is open - handle menu interactions
+    if (touchData.active) {
+      // Check if touch is on back button (top left, 5-55 x, 5-35 y)
+      if (touchData.x >= 5 && touchData.x < 55 && touchData.y >= 5 && touchData.y < 35) {
+        menu.close(display.getTFT());
+        // Redraw main interface after closing menu
+        drawMainScreen();
+      }
+    }
+    // Don't process other touches when menu is open
+    yield();
+    return;
+  }
+  
+  // Menu is closed - handle normal interface
+  // Check if menu button was touched (before other area checks)
+  if (touchData.active && menu.isMenuButtonTouched(touchData.x, touchData.y, screenWidth, screenHeight)) {
+    menu.open(display.getTFT());
+    yield();
+    return;
+  }
+  // Check if panic button was touched (above menu button)
+  if (touchData.active && menu.isPanicButtonTouched(touchData.x, touchData.y, screenWidth, screenHeight)) {
+    // Trigger master volume ramp down to silence
+    masterVolumeTarget = 0.0f;
+    // Also stop generating new notes immediately
+    isTouching = false;
+    // Clear delay buffer and internal state so tails are killed
+    stereoDelay.reset();
+    yield();
+    return;
+  }
+  
   bool inTopArea = touchData.active && (touchData.y < controlAreaHeight);
-  bool inBottomArea = touchData.active && (touchData.y >= controlAreaHeight);
+  bool inBottomArea = touchData.active && (touchData.y >= controlAreaHeight) &&
+                      (touchData.x >= MENU_BUTTON_WIDTH) &&
+                      !display.isInMenuButtonArea(touchData.x, touchData.y);
   
   if (inTopArea) {
     // Top half: Pitch and filter control
     // X-axis controls pitch: quantized to pentatonic scale
-    float freq = pentatonicUI.touchToFrequency(touchData.x, screenWidth);
+    // Map touch X to a stable key index (independent of base note)
+    int keyIndex = pentatonicUI.touchToKeyIndex(touchData.x, screenWidth);
+    float freq = pentatonicUI.keyIndexToFrequency(keyIndex);
     currentFreq = freq;
     
     // Y-axis controls low-pass filter cutoff (only top half of screen)
     float filterCutoff = pentatonicUI.touchToFilterCutoff(touchData.y, screenHeight);
     currentFilterCutoff = filterCutoff;
     
-    // Determine which pentatonic zone we're in
-    int zoneIndex = pentatonicUI.getZone(freq);
-    
-    // Update display with zone highlighting
-    pentatonicUI.updateDisplay(display.getTFT(), true, zoneIndex, freq);
+    // Update display with key highlighting (use key index directly)
+    pentatonicUI.updateDisplay(display.getTFT(), true, keyIndex);
+
+    // If we were in panic (volume at 0), restore volume target so it ramps back up
+    if (masterVolumeTarget == 0.0f) {
+      masterVolumeTarget = lastUserVolume;
+    }
     
     isTouching = true;  // Set touch flag for audio task
   } else if (inBottomArea) {
-    // Bottom half: Parameter controls (delay time, LFO depth, LFO speed)
-    // X-axis determines which parameter (0=delay, 1=LFO depth, 2=LFO speed)
+    // Bottom half: Parameter controls (delay time, delay feedback, LFO depth, LFO speed)
     // Y-axis controls the value (vertical sliders)
     ParameterType param = parameterControl.touchToParameter(touchData.x, touchData.y, screenWidth, screenHeight);
     
     if (param == PARAM_DELAY_TIME) {
       float delayTime = parameterControl.touchToDelayTime(touchData.y, screenHeight);
       targetDelayTimeMs = delayTime;  // Set target, smoothing will happen in audio task
+    } else if (param == PARAM_DELAY_FEEDBACK) {
+      float feedback = parameterControl.touchToDelayFeedback(touchData.y, screenHeight);
+      currentDelayFeedback = feedback;  // Directly control feedback (no smoothing needed)
     } else if (param == PARAM_LFO_DEPTH) {
       float lfoDepth = parameterControl.touchToLFODepth(touchData.y, screenHeight);
       targetLFODepthMs = lfoDepth;  // Set target, smoothing will happen in audio task
@@ -336,29 +432,35 @@ void loop() {
   } else {
     // No touch - keep filter at last position (sound continues via delay)
     isTouching = false;  // Clear touch flag (stop generating new audio, but delay continues)
-    pentatonicUI.updateDisplay(display.getTFT(), false, -1, 0.0);
+    pentatonicUI.updateDisplay(display.getTFT(), false, -1);
   }
   
   // Update display periodically (separate from touch polling for performance)
   display.update();
   
   // Update parameter display periodically to show current values (use smoothed values for smooth slider)
-  static unsigned long lastParamUpdate = 0;
+  // Only update if menu is closed
+  if (menu.getState() == MENU_CLOSED) {
+    static unsigned long lastParamUpdate = 0;
   unsigned long currentTime = millis();
-  if (currentTime - lastParamUpdate >= DISPLAY_UPDATE_INTERVAL) {
-    lastParamUpdate = currentTime;
-    // Use smoothed values for UI display (smooth slider movement)
-    // Show actual values from audio task (with LFO modulation applied)
-    parameterControl.updateParameterDisplay(display.getTFT(), PARAM_DELAY_TIME, 
-                                             parameterControl.getSmoothedDelayTime(), actualDelayTimeMs);
-    parameterControl.updateParameterDisplay(display.getTFT(), PARAM_LFO_DEPTH, 
-                                             parameterControl.getSmoothedLFODepth(), actualLFODepthMs);
-    parameterControl.updateParameterDisplay(display.getTFT(), PARAM_LFO_SPEED, 
-                                             parameterControl.getSmoothedLFOSpeed(), actualLFOSpeedHz);
-    parameterControl.updateParameterDisplay(display.getTFT(), PARAM_BASE_NOTE, 
-                                             (float)parameterControl.getBaseNoteDetent(), (float)currentBaseNoteDetent);
-    parameterControl.updateParameterDisplay(display.getTFT(), PARAM_UPPER_TONE, 
-                                             (float)parameterControl.getUpperToneDetent(), (float)currentUpperToneDetent);
+    if (currentTime - lastParamUpdate >= DISPLAY_UPDATE_INTERVAL) {
+      lastParamUpdate = currentTime;
+      // Use smoothed values for UI display (smooth slider movement)
+      // Show actual values from audio task (with LFO modulation applied)
+      parameterControl.updateParameterDisplay(display.getTFT(), PARAM_DELAY_TIME, 
+                                               parameterControl.getSmoothedDelayTime(), actualDelayTimeMs);
+      parameterControl.updateParameterDisplay(display.getTFT(), PARAM_LFO_DEPTH, 
+                                               parameterControl.getSmoothedLFODepth(), actualLFODepthMs);
+      parameterControl.updateParameterDisplay(display.getTFT(), PARAM_LFO_SPEED, 
+                                               parameterControl.getSmoothedLFOSpeed(), actualLFOSpeedHz);
+      parameterControl.updateParameterDisplay(display.getTFT(), PARAM_BASE_NOTE, 
+                                               (float)parameterControl.getBaseNoteDetent(), (float)currentBaseNoteDetent);
+      parameterControl.updateParameterDisplay(display.getTFT(), PARAM_UPPER_TONE, 
+                                               (float)parameterControl.getUpperToneDetent(), (float)currentUpperToneDetent);
+
+      // Always draw menu button last so it stays visible on top of parameter sliders
+      menu.drawButton(display.getTFT());
+    }
   }
   
   // Minimal delay - touch polling is priority for smooth audio

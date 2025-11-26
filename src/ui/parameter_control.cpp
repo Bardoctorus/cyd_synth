@@ -9,6 +9,7 @@
 
 ParameterControl::ParameterControl() 
   : smoothedDelayTime(DELAY_TIME_MS_DEFAULT),
+    smoothedDelayFeedback(DELAY_FEEDBACK),
     smoothedLFODepth(LFO_DEPTH_MS_DEFAULT),
     smoothedLFOSpeed(LFO_SPEED_HZ_DEFAULT),
     currentBaseNoteDetent(BASE_NOTE_DEFAULT),
@@ -21,19 +22,24 @@ bool ParameterControl::isInParameterArea(int touchY, int screenHeight) {
 }
 
 int ParameterControl::getParameterStripWidth(int screenWidth) {
-  // Divide bottom half into 5 vertical strips (one for each parameter)
-  return screenWidth / NUM_PARAMETERS;
+  // Use a fixed strip width for each fader region, leaving empty space on the right
+  (void)screenWidth;  // Unused (kept for interface compatibility)
+  return FADER_STRIP_WIDTH;
 }
 
 int ParameterControl::getParameterStripX(ParameterType param, int screenWidth) {
   int stripWidth = getParameterStripWidth(screenWidth);
-  return param * stripWidth;
+  // Start immediately to the right of the menu button
+  return MENU_BUTTON_WIDTH + param * stripWidth;
 }
 
 ParameterType ParameterControl::touchToParameter(int touchX, int touchY, int screenWidth, int screenHeight) {
   // Determine which parameter strip the touch is in (based on X position)
   int stripWidth = getParameterStripWidth(screenWidth);
-  int stripIndex = touchX / stripWidth;
+  // Shift touch coordinate so 0 starts at the right edge of the menu button
+  int localX = touchX - MENU_BUTTON_WIDTH;
+  if (localX < 0) localX = 0;
+  int stripIndex = localX / stripWidth;
   
   // Clamp to valid parameter range
   if (stripIndex < 0) stripIndex = 0;
@@ -85,6 +91,25 @@ float ParameterControl::touchToLFODepth(int touchY, int screenHeight) {
   updateSmoothing(PARAM_LFO_DEPTH, lfoDepth);
   
   return lfoDepth;
+}
+
+float ParameterControl::touchToDelayFeedback(int touchY, int screenHeight) {
+  // Map touch Y position (in bottom half) to delay feedback (1% - 100%)
+  // Vertical slider: top of bottom half = max feedback, bottom = min feedback
+  int controlAreaHeight = screenHeight / 2;
+  int controlAreaY = controlAreaHeight;
+  int relativeY = touchY - controlAreaY;
+  float yPos = 1.0 - ((float)relativeY / (float)controlAreaHeight);  // Invert: top = 1.0, bottom = 0.0
+  yPos = constrain(yPos, 0.0, 1.0);
+  
+  // Linear mapping: 0.0 to 1.0 -> DELAY_FEEDBACK_MIN to DELAY_FEEDBACK_MAX
+  float feedback = DELAY_FEEDBACK_MIN + yPos * (DELAY_FEEDBACK_MAX - DELAY_FEEDBACK_MIN);
+  feedback = constrain(feedback, DELAY_FEEDBACK_MIN, DELAY_FEEDBACK_MAX);
+  
+  // Update smoothed value for UI display
+  updateSmoothing(PARAM_DELAY_FEEDBACK, feedback);
+  
+  return feedback;
 }
 
 float ParameterControl::touchToLFOSpeed(int touchY, int screenHeight) {
@@ -156,6 +181,9 @@ void ParameterControl::updateSmoothing(ParameterType param, float targetValue) {
     case PARAM_DELAY_TIME:
       smoothedDelayTime += (targetValue - smoothedDelayTime) * smoothingRate;
       break;
+    case PARAM_DELAY_FEEDBACK:
+      smoothedDelayFeedback += (targetValue - smoothedDelayFeedback) * smoothingRate;
+      break;
     case PARAM_LFO_DEPTH:
       smoothedLFODepth += (targetValue - smoothedLFODepth) * smoothingRate;
       break;
@@ -167,19 +195,35 @@ void ParameterControl::updateSmoothing(ParameterType param, float targetValue) {
   }
 }
 
+// Helper to draw a vertical label string (one character per row)
+static void drawVerticalLabel(TFT_eSPI& tft, const char* text, int x, int yStart) {
+  int len = strlen(text);
+  int charHeight = 8;  // Approximate height for default font at textSize=1
+  for (int i = 0; i < len; i++) {
+    char c = text[i];
+    tft.setCursor(x, yStart + i * charHeight);
+    tft.print(c);
+  }
+}
+
 void ParameterControl::drawControls(TFT_eSPI& tft) {
   int screenHeight = tft.height();
   int screenWidth = tft.width();
   int controlAreaHeight = screenHeight / 2;
   int controlAreaY = controlAreaHeight;
   int stripWidth = getParameterStripWidth(screenWidth);
+  const int labelColumnWidth = 10;  // Pixels reserved at left of each strip for vertical text
   
   // Draw divider line between top and bottom halves
   tft.drawLine(0, controlAreaY, screenWidth, controlAreaY, TFT_WHITE);
-  
-  // Draw vertical dividers between parameter strips
+
+  // Draw vertical divider at right edge of menu button (for clarity)
+  int menuDividerX = MENU_BUTTON_WIDTH;
+  tft.drawLine(menuDividerX, controlAreaY, menuDividerX, screenHeight - 1, TFT_WHITE);
+
+  // Draw vertical dividers between parameter strips (to the right of menu)
   for (int i = 1; i < NUM_PARAMETERS; i++) {
-    int x = i * stripWidth;
+    int x = MENU_BUTTON_WIDTH + i * stripWidth;
     tft.drawLine(x, controlAreaY, x, screenHeight - 1, TFT_DARKGREY);
   }
   
@@ -187,33 +231,37 @@ void ParameterControl::drawControls(TFT_eSPI& tft) {
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(1);
   
+  // Draw vertical labels for each parameter
+  // Labels are drawn near the left side of each fader area, against the divider
+  int labelTopY = controlAreaY + 5;
+
   // Delay Time label
   int delayX = getParameterStripX(PARAM_DELAY_TIME, screenWidth);
-  tft.setCursor(delayX + 5, controlAreaY + 5);
-  tft.print("Delay");
+  drawVerticalLabel(tft, "Delay", delayX + 2, labelTopY);
+
+  // Delay Feedback label
+  int feedbackX = getParameterStripX(PARAM_DELAY_FEEDBACK, screenWidth);
+  drawVerticalLabel(tft, "Feedback", feedbackX + 2, labelTopY);
   
   // LFO Depth label
   int depthX = getParameterStripX(PARAM_LFO_DEPTH, screenWidth);
-  tft.setCursor(depthX + 5, controlAreaY + 5);
-  tft.print("LFO Depth");
+  drawVerticalLabel(tft, "LFO Depth", depthX + 2, labelTopY);
   
   // LFO Speed label
   int speedX = getParameterStripX(PARAM_LFO_SPEED, screenWidth);
-  tft.setCursor(speedX + 5, controlAreaY + 5);
-  tft.print("LFO Speed");
+  drawVerticalLabel(tft, "LFO Speed", speedX + 2, labelTopY);
   
   // Base Tone label
   int baseNoteX = getParameterStripX(PARAM_BASE_NOTE, screenWidth);
-  tft.setCursor(baseNoteX + 5, controlAreaY + 5);
-  tft.print("Base Tone");
+  drawVerticalLabel(tft, "Base Tone", baseNoteX + 2, labelTopY);
   
   // Upper Tone label
   int upperToneX = getParameterStripX(PARAM_UPPER_TONE, screenWidth);
-  tft.setCursor(upperToneX + 5, controlAreaY + 5);
-  tft.print("Upper Tone");
+  drawVerticalLabel(tft, "Upper Tone", upperToneX + 2, labelTopY);
   
   // Draw initial sliders and values (UI and actual values are same at startup)
   updateParameterDisplay(tft, PARAM_DELAY_TIME, DELAY_TIME_MS_DEFAULT, DELAY_TIME_MS_DEFAULT);
+  updateParameterDisplay(tft, PARAM_DELAY_FEEDBACK, DELAY_FEEDBACK, DELAY_FEEDBACK);
   updateParameterDisplay(tft, PARAM_LFO_DEPTH, LFO_DEPTH_MS_DEFAULT, LFO_DEPTH_MS_DEFAULT);
   updateParameterDisplay(tft, PARAM_LFO_SPEED, LFO_SPEED_HZ_DEFAULT, LFO_SPEED_HZ_DEFAULT);
   updateParameterDisplay(tft, PARAM_BASE_NOTE, (float)BASE_NOTE_DEFAULT, (float)BASE_NOTE_DEFAULT);
@@ -227,12 +275,23 @@ void ParameterControl::updateParameterDisplay(TFT_eSPI& tft, ParameterType param
   int controlAreaY = controlAreaHeight;
   int stripWidth = getParameterStripWidth(screenWidth);
   int stripX = getParameterStripX(param, screenWidth);
+  const int labelColumnWidth = 10;  // Match drawControls
   
   // Clear old value and slider area for this parameter
-  tft.fillRect(stripX + 2, controlAreaY + 15, stripWidth - 4, controlAreaHeight - 20, TFT_BLACK);
+  // Leave the left label column untouched so vertical text is not erased
+  int clearX = stripX + labelColumnWidth + 2;
+  int clearW = stripWidth - (labelColumnWidth + 4);
+  if (clearW < 0) clearW = 0;
+  tft.fillRect(clearX, controlAreaY + 15, clearW, controlAreaHeight - 20, TFT_BLACK);
   
   // Draw slider track (vertical)
-  int trackX = stripX + stripWidth / 2;
+  // Place track inside the fader region, with a 2-pixel gap from label area on the left
+  // and a 2-pixel gap from the right divider so the thumb never touches the line.
+  // Pattern per strip: divider | 2px gap | vertical text | 2px gap | fader | 2px gap | next divider
+  int faderLeft = stripX + labelColumnWidth + 3;   // 2px gap after label column
+  int faderRight = stripX + stripWidth - 3;        // 2px gap before next divider
+  if (faderRight < faderLeft) faderRight = faderLeft;
+  int trackX = (faderLeft + faderRight) / 2;
   tft.drawLine(trackX, controlAreaY + 20, trackX, screenHeight - 10, TFT_DARKGREY);
   
   // Draw detent dots for base tone and upper tone (5 detents)
@@ -262,6 +321,9 @@ void ParameterControl::updateParameterDisplay(TFT_eSPI& tft, ParameterType param
     normalizedPos = (logValue - logMin) / (logMax - logMin);
     snprintf(uiValueStr, sizeof(uiValueStr), "%.0f ms", uiValue);
     snprintf(actualValueStr, sizeof(actualValueStr), "%.0f ms", actualValue);
+  } else if (param == PARAM_DELAY_FEEDBACK) {
+    // Linear mapping for delay feedback
+    normalizedPos = (uiValue - DELAY_FEEDBACK_MIN) / (DELAY_FEEDBACK_MAX - DELAY_FEEDBACK_MIN);
   } else if (param == PARAM_LFO_DEPTH) {
     // Linear mapping for LFO depth
     normalizedPos = (uiValue - LFO_DEPTH_MS_MIN) / (LFO_DEPTH_MS_MAX - LFO_DEPTH_MS_MIN);
@@ -310,12 +372,5 @@ void ParameterControl::updateParameterDisplay(TFT_eSPI& tft, ParameterType param
   tft.fillCircle(trackX, sliderY, 5, TFT_CYAN);
   tft.drawCircle(trackX, sliderY, 5, TFT_WHITE);
   
-  // Draw value (red) - centered below slider for all parameters
-  // For delay/LFO params: show actual value only (no UI value)
-  // For base tone/upper tone: show actual value
-  tft.setTextColor(TFT_RED, TFT_BLACK);
-  tft.setTextSize(1);
-  int textX = stripX + (stripWidth - strlen(actualValueStr) * 6) / 2;  // Center text
-  tft.setCursor(textX, screenHeight - 15);
-  tft.print(actualValueStr);
+  // Fader value text is intentionally disabled for now to keep the layout compact
 }

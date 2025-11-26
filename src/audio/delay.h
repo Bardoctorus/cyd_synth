@@ -12,7 +12,8 @@ class StereoDelay {
 public:
   StereoDelay();
   void init();
-  void process(float inputLeft, float inputRight, float& outputLeft, float& outputRight, float delayTimeMs, float delayVarianceMs);
+  void process(float inputLeft, float inputRight, float& outputLeft, float& outputRight, float delayTimeMs, float delayVarianceMs, float feedback);
+  void reset();
   
 private:
   int16_t* delayBuffer;

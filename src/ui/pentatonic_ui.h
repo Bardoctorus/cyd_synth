@@ -18,23 +18,23 @@ class PentatonicUI {
 public:
   PentatonicUI();
   
-  // Convert touch position to frequency (quantized to pentatonic)
-  float touchToFrequency(int touchX, int screenWidth);
+  // Number of visual keys in the current pentatonic layout
+  int getTotalKeys(int screenWidth);
+  
+  // Convert touch position to a discrete key index (0 .. totalKeys-1)
+  int touchToKeyIndex(int touchX, int screenWidth);
+  
+  // Convert a key index to frequency, using the current base frequency
+  float keyIndexToFrequency(int keyIndex);
   
   // Set base frequency for pentatonic scale (called when base note slider changes)
   void setBaseFrequency(float baseFreq);
   
   // Convert touch position to filter cutoff
   float touchToFilterCutoff(int touchY, int screenHeight);
-  
-  // Get pentatonic zone for a frequency
-  int getZone(float frequency);
-  
-  // Get zone boundaries for visualization
-  PentatonicZone getZoneBounds(float frequency, int screenWidth);
-  
-  // Update display with zone highlighting
-  void updateDisplay(TFT_eSPI& tft, bool touching, int zoneIndex, float frequency);
+    
+  // Update display with key highlighting (keyIndex is the visual key index)
+  void updateDisplay(TFT_eSPI& tft, bool touching, int keyIndex);
   
 private:
   float quantizeToPentatonic(float freq);
