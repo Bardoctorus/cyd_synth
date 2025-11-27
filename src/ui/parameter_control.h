@@ -9,6 +9,7 @@
 #include <TFT_eSPI.h>
 
 enum ParameterType {
+  PARAM_NONE = -1,        // No active parameter (touch outside fader regions)
   PARAM_DELAY_TIME = 0,
   PARAM_DELAY_FEEDBACK = 1,
   PARAM_LFO_DEPTH = 2,

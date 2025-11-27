@@ -370,9 +370,13 @@ void loop() {
   }
   
   bool inTopArea = touchData.active && (touchData.y < controlAreaHeight);
-  bool inBottomArea = touchData.active && (touchData.y >= controlAreaHeight) &&
-                      (touchData.x >= MENU_BUTTON_WIDTH) &&
-                      !display.isInMenuButtonArea(touchData.x, touchData.y);
+  // Bottom area is limited strictly to the fader region rectangle
+  int fadersLeftX = MENU_BUTTON_WIDTH;
+  int fadersRightX = MENU_BUTTON_WIDTH + NUM_PARAMETERS * FADER_STRIP_WIDTH;
+  bool inBottomArea = touchData.active &&
+                      (touchData.y >= controlAreaHeight) &&
+                      (touchData.x >= fadersLeftX) &&
+                      (touchData.x < fadersRightX);
   
   if (inTopArea) {
     // Top half: Pitch and filter control
@@ -399,6 +403,13 @@ void loop() {
     // Bottom half: Parameter controls (delay time, delay feedback, LFO depth, LFO speed)
     // Y-axis controls the value (vertical sliders)
     ParameterType param = parameterControl.touchToParameter(touchData.x, touchData.y, screenWidth, screenHeight);
+
+    // Ignore touches that fall outside any defined fader region
+    if (param == PARAM_NONE) {
+      isTouching = false;
+      yield();
+      return;
+    }
     
     if (param == PARAM_DELAY_TIME) {
       float delayTime = parameterControl.touchToDelayTime(touchData.y, screenHeight);
@@ -449,6 +460,8 @@ void loop() {
       // Show actual values from audio task (with LFO modulation applied)
       parameterControl.updateParameterDisplay(display.getTFT(), PARAM_DELAY_TIME, 
                                                parameterControl.getSmoothedDelayTime(), actualDelayTimeMs);
+      parameterControl.updateParameterDisplay(display.getTFT(), PARAM_DELAY_FEEDBACK, 
+                                               parameterControl.getSmoothedDelayFeedback(), currentDelayFeedback);
       parameterControl.updateParameterDisplay(display.getTFT(), PARAM_LFO_DEPTH, 
                                                parameterControl.getSmoothedLFODepth(), actualLFODepthMs);
       parameterControl.updateParameterDisplay(display.getTFT(), PARAM_LFO_SPEED, 

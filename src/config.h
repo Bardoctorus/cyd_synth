@@ -41,8 +41,8 @@ const float UPPER_TONE_SEMITONES[5] = {5.0, 7.0, 9.0, 12.0, 14.0};
 #define DELAY_TIME_VARIANCE_MS_MIN 20.0  // Minimum stereo variance (ms)
 #define DELAY_TIME_VARIANCE_MS_MAX 200.0 // Maximum stereo variance (ms)
 #define DELAY_FEEDBACK   0.6    // Feedback level (60%)
-#define DELAY_FEEDBACK_MIN 0.01  // Minimum feedback (1%)
-#define DELAY_FEEDBACK_MAX 1.0   // Maximum feedback (100%)
+#define DELAY_FEEDBACK_MIN 0.001  // Minimum feedback (0.1%)
+#define DELAY_FEEDBACK_MAX 1.2   // Maximum feedback (120% - overdrive/runaway zone)
 #define DELAY_TIME_VARIANCE_MS 45.0  // Stereo width: time difference between L and R channels
 #define DELAY_SEND_LEVEL 0.3    // Send level: how much of the filtered instrument goes to delay (0.0 to 1.0)
 

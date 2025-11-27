@@ -35,17 +35,20 @@ int ParameterControl::getParameterStripX(ParameterType param, int screenWidth) {
 
 ParameterType ParameterControl::touchToParameter(int touchX, int touchY, int screenWidth, int screenHeight) {
   // Determine which parameter strip the touch is in (based on X position)
+  // This uses the same geometry as drawControls so visual and touch regions match.
   int stripWidth = getParameterStripWidth(screenWidth);
-  // Shift touch coordinate so 0 starts at the right edge of the menu button
-  int localX = touchX - MENU_BUTTON_WIDTH;
-  if (localX < 0) localX = 0;
-  int stripIndex = localX / stripWidth;
-  
-  // Clamp to valid parameter range
-  if (stripIndex < 0) stripIndex = 0;
-  if (stripIndex >= NUM_PARAMETERS) stripIndex = NUM_PARAMETERS - 1;
-  
-  return (ParameterType)stripIndex;
+
+  for (int i = 0; i < NUM_PARAMETERS; i++) {
+    ParameterType param = static_cast<ParameterType>(i);
+    int stripX = getParameterStripX(param, screenWidth);
+    int stripRight = stripX + stripWidth;
+    if (touchX >= stripX && touchX < stripRight && isInParameterArea(touchY, screenHeight)) {
+      return param;
+    }
+  }
+
+  // Touch was outside all fader regions
+  return PARAM_NONE;
 }
 
 float ParameterControl::touchToDelayTime(int touchY, int screenHeight) {
@@ -292,7 +295,26 @@ void ParameterControl::updateParameterDisplay(TFT_eSPI& tft, ParameterType param
   int faderRight = stripX + stripWidth - 3;        // 2px gap before next divider
   if (faderRight < faderLeft) faderRight = faderLeft;
   int trackX = (faderLeft + faderRight) / 2;
-  tft.drawLine(trackX, controlAreaY + 20, trackX, screenHeight - 10, TFT_DARKGREY);
+  int trackStartY = controlAreaY + 20;
+  int trackEndY = screenHeight - 10;
+  int trackHeight = trackEndY - trackStartY;
+  
+  // For feedback fader, draw danger zone (100%-120%) in red
+  if (param == PARAM_DELAY_FEEDBACK) {
+    // Calculate where 100% mark is (top of danger zone)
+    // normalizedPos 0.0 = 120% (top), 1.0 = 0.1% (bottom)
+    // 100% is at normalizedPos = (1.2 - 1.0) / (1.2 - 0.001) ≈ 0.167
+    float dangerZoneStart = (1.2f - 1.0f) / (DELAY_FEEDBACK_MAX - DELAY_FEEDBACK_MIN);
+    int dangerZoneY = trackStartY + (int)(dangerZoneStart * trackHeight);
+    
+    // Draw normal track (below 100%)
+    tft.drawLine(trackX, dangerZoneY, trackX, trackEndY, TFT_DARKGREY);
+    // Draw danger zone track (100%-120%) in red
+    tft.drawLine(trackX, trackStartY, trackX, dangerZoneY, TFT_RED);
+  } else {
+    // Normal track for other parameters
+    tft.drawLine(trackX, trackStartY, trackX, trackEndY, TFT_DARKGREY);
+  }
   
   // Draw detent dots for base tone and upper tone (5 detents)
   if (param == PARAM_BASE_NOTE || param == PARAM_UPPER_TONE) {
@@ -369,8 +391,18 @@ void ParameterControl::updateParameterDisplay(TFT_eSPI& tft, ParameterType param
   int sliderY = controlAreaY + 20 + (int)(normalizedPos * (controlAreaHeight - 30));
   
   // Draw slider thumb
-  tft.fillCircle(trackX, sliderY, 5, TFT_CYAN);
-  tft.drawCircle(trackX, sliderY, 5, TFT_WHITE);
+  // For feedback fader, use red thumb if in danger zone (100%-120%)
+  uint16_t thumbColor = TFT_CYAN;
+  uint16_t thumbOutline = TFT_WHITE;
+  if (param == PARAM_DELAY_FEEDBACK) {
+    // Check if current value is in danger zone (> 100%)
+    if (actualValue > 1.0f) {
+      thumbColor = TFT_RED;
+      thumbOutline = TFT_WHITE;
+    }
+  }
+  tft.fillCircle(trackX, sliderY, 5, thumbColor);
+  tft.drawCircle(trackX, sliderY, 5, thumbOutline);
   
   // Fader value text is intentionally disabled for now to keep the layout compact
 }
